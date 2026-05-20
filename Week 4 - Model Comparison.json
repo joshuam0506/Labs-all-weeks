@@ -1,0 +1,504 @@
+{
+  "name": "Week 4 - Model Comparison",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        0
+      ],
+      "id": "6cc58813-7dba-4977-9fcc-bc623f56c026",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appTfeg2hZsTFzOcC",
+          "mode": "list",
+          "cachedResultName": "Week 4 Model Comparison",
+          "cachedResultUrl": "https://airtable.com/appTfeg2hZsTFzOcC"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblIwmO5RYLP9tEkz",
+          "mode": "list",
+          "cachedResultName": "Test Results",
+          "cachedResultUrl": "https://airtable.com/appTfeg2hZsTFzOcC/tblIwmO5RYLP9tEkz"
+        },
+        "filterByFormula": "={input_text} != \"\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        -528,
+        -112
+      ],
+      "id": "690ac8b1-3282-443b-a8a1-08f8c6b7f292",
+      "name": "Search records",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ZiQMVGV2q1UHmPMz",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": \"{{ $json.fields.input_text }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -416,
+        0
+      ],
+      "id": "f3fb2f6a-817f-4364-af43-839c3a65c966",
+      "name": "HF Sentiment",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "EqUPqRSiiMZmCOTE",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6ec1b55d-139e-4160-8d8a-f110b14ada01",
+              "name": "record_id",
+              "value": "={{ $('Search records').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "91d2e2e2-f214-47db-8930-e0887367aabd",
+              "name": "input_text",
+              "value": "={{ $('Search records').item.json.fields.input_text }}",
+              "type": "string"
+            },
+            {
+              "id": "277c847d-9080-4e9b-8dc9-89603db6f22a",
+              "name": "sentiment_label",
+              "value": "={{ $json.label || $json[0]?.label }}",
+              "type": "string"
+            },
+            {
+              "id": "163d6991-b274-4c0d-abc1-5fd83909a001",
+              "name": "sentiment_score",
+              "value": "={{ Number(Number($json.score || $json[0]?.score).toFixed(3)) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": "={{ false }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -304,
+        -112
+      ],
+      "id": "dbc43172-ea93-48b1-a796-2b4446427aac",
+      "name": "Extract Sentiment"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": \"{{ $json.input_text }}\",\n  \"parameters\": {\n    \"candidate_labels\": [\n      \"fraudulent activity\",\n      \"routine transaction\",\n      \"requires review\"\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -192,
+        0
+      ],
+      "id": "991f1ec3-f5f3-41f9-9c9c-b7fcf69b6f5d",
+      "name": "HF Zero-Shot",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "EqUPqRSiiMZmCOTE",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const zeroShotItems = $input.all();\nconst sentimentItems = $('Extract Sentiment').all();\n\nconst out = [];\n\nfor (let i = 0; i < zeroShotItems.length; i += 3) {\n  const top = zeroShotItems[i].json;\n  const originalIndex = Math.floor(i / 3);\n  const sentiment = sentimentItems[originalIndex].json;\n\n  out.push({\n    json: {\n      ...sentiment,\n      zeroshot_label: top.label,\n      zeroshot_score: Number(Number(top.score).toFixed(3))\n    }\n  });\n}\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -112
+      ],
+      "id": "c9fcf9a8-9d2c-48fc-920e-7727326a9f31",
+      "name": "Keep Top Zero Shot"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/dslim/bert-large-NER",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": \"{{ $json.input_text }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        32,
+        16
+      ],
+      "id": "74559090-8530-48e2-8a33-d91d0dd0e0df",
+      "name": "HF NER",
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "EqUPqRSiiMZmCOTE",
+          "name": "Bearer Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const previousItems = $('Keep Top Zero Shot').all();\nconst nerItems = $input.all();\n\nconst out = previousItems.map((item) => ({\n  json: {\n    ...item.json,\n    ner_entities: \"No entities found\"\n  }\n}));\n\nfor (const item of nerItems) {\n  const pairedIndex =\n    item.pairedItem?.item ??\n    item.pairedItem?.[0]?.item ??\n    0;\n\n  const entity = item.json.word || item.json.entity_group || item.json.entity || \"unknown\";\n  const type = item.json.entity_group || item.json.entity || \"ENTITY\";\n  const score = item.json.score ? Number(item.json.score).toFixed(3) : \"n/a\";\n\n  const text = `${entity} (${type}, ${score})`;\n\n  if (out[pairedIndex]) {\n    if (out[pairedIndex].json.ner_entities === \"No entities found\") {\n      out[pairedIndex].json.ner_entities = text;\n    } else {\n      out[pairedIndex].json.ner_entities += \"; \" + text;\n    }\n  }\n}\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -112
+      ],
+      "id": "a2d0116e-f7a4-4bee-a5ae-80b3d5b458c4",
+      "name": "Extract NER"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a fraud analyst. Classify the transaction risk as: CRITICAL, HIGH, MEDIUM, LOW, or ROUTINE. Reply with the severity level and one sentence of reasoning.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.input_text }}\"\n    }\n  ],\n  \"temperature\": 0.2,\n  \"max_tokens\": 100\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        0
+      ],
+      "id": "c84ebb45-bc0d-45e1-a39d-8c127afcbdd4",
+      "name": "Groq",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "7rMfKiHZ8BecV4W4",
+          "name": "Bearer Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appTfeg2hZsTFzOcC",
+          "mode": "list",
+          "cachedResultName": "Week 4 Model Comparison",
+          "cachedResultUrl": "https://airtable.com/appTfeg2hZsTFzOcC"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblIwmO5RYLP9tEkz",
+          "mode": "list",
+          "cachedResultName": "Test Results",
+          "cachedResultUrl": "https://airtable.com/appTfeg2hZsTFzOcC/tblIwmO5RYLP9tEkz"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Extract NER').item.json.record_id }}",
+            "model_1_sentiment_score": "={{ $('Extract NER').item.json.sentiment_score }}",
+            "model_1_sentiment_label": "={{ $('Extract NER').item.json.sentiment_label }}",
+            "model_4_groq_classification": "={{ $('Groq').item.json.choices[0].message.content }}",
+            "model_2_zeroshot_label": "={{ $('Extract NER').item.json.zeroshot_label }}",
+            "model_2_zeroshot_score": "={{ $('Extract NER').item.json.zeroshot_score }}",
+            "model_3_ner_entities": "={{ $('Extract NER').item.json.ner_entities }}",
+            "tested_at": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "input_text",
+              "displayName": "input_text",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_1_sentiment_label",
+              "displayName": "model_1_sentiment_label",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_1_sentiment_score",
+              "displayName": "model_1_sentiment_score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_2_zeroshot_label",
+              "displayName": "model_2_zeroshot_label",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_2_zeroshot_score",
+              "displayName": "model_2_zeroshot_score",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_3_ner_entities",
+              "displayName": "model_3_ner_entities",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "model_4_groq_classification",
+              "displayName": "model_4_groq_classification",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "tested_at",
+              "displayName": "tested_at",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        368,
+        -112
+      ],
+      "id": "1e00c60e-962a-4879-8726-ecc5854069e7",
+      "name": "Update record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "ZiQMVGV2q1UHmPMz",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "HF Sentiment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HF Sentiment": {
+      "main": [
+        [
+          {
+            "node": "Extract Sentiment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sentiment": {
+      "main": [
+        [
+          {
+            "node": "HF Zero-Shot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HF Zero-Shot": {
+      "main": [
+        [
+          {
+            "node": "Keep Top Zero Shot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Top Zero Shot": {
+      "main": [
+        [
+          {
+            "node": "HF NER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HF NER": {
+      "main": [
+        [
+          {
+            "node": "Extract NER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract NER": {
+      "main": [
+        [
+          {
+            "node": "Groq",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq": {
+      "main": [
+        [
+          {
+            "node": "Update record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a249117a-f608-46ca-a979-2affc0afb981",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8ed17c2faf4c74813105061115c1b90340d3d41f2670cb6285150706c9669ce9"
+  },
+  "id": "t5jn0QXPRwQamvVD",
+  "tags": []
+}
