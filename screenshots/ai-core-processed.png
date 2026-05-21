@@ -2,73 +2,36 @@
 
 **Date:** 2026-05-21  
 **Team:** Financial Fraud Detection Group  
-**Test record:** Existing transaction records from the Financial Fraud Detection Airtable base, including suspicious transactions such as TXN-0019, TXN-0007, and TXN-0014.
+**Project:** AI Capstone Financial Fraud Detection System  
+**Component Focus:** End-to-End Integration Test  
+
+---
 
 ## End-to-End Status: PARTIAL
 
-The system is partially working. Transaction records exist in Airtable, AI Core results are visible in the AI output fields, and fraud investigation case records were created for suspicious transactions. However, the team still needs to confirm that one single record flows through all components in the same Airtable base without manual copying or switching between base copies.
+The system is partially working. Transaction records exist in Airtable, AI Core processing has successfully filled AI output fields, and fraud investigation case records exist for suspicious transactions. However, the full end-to-end pipeline still needs to be confirmed using one single record in the same Airtable base from start to finish.
 
-## Component-by-Component Results
+The main issue is that there appear to be multiple Airtable base copies or views being used. Some tables show the original transaction records, another table shows AI Core results, and another table shows fraud investigation case records. Because of that, the checkpoint is marked **PARTIAL** instead of **PASSED**.
 
-### Ingestion
+---
 
-- **Status:** Working
-- **What happened:** Transaction records were successfully created in Airtable. The Transactions table contains fields such as `transaction_id`, `timestamp`, `sender_id`, `recipient_id`, `amount`, `transaction_type`, `description`, and `status`.
-- **Screenshot:** `screenshots/ingestion-record.png`
+## Test Record Used
 
-### AI Core
+For this checkpoint test, the project used existing financial fraud transaction records from Airtable, including suspicious records such as:
 
-- **Status:** Working
-- **What happened:** AI Core results were successfully written into Airtable. The table shows fields such as `HF Label`, `HF Confidence`, `Groq Analysis`, and `AI Processed`. The records show `AI Processed = TRUE`, which confirms that the AI workflow updated the Airtable records.
-- **Screenshot:** `screenshots/ai-core-processed.png`
+| Transaction ID | Amount | Transaction Type | Status / Result |
+|---|---:|---|---|
+| TXN-0007 | 67.45 | payment | case_created |
+| TXN-0014 | 875.60 | transfer | case_created |
+| TXN-0019 | 7800.00 | transfer | case_created |
 
-### Specialist
+These records were used because they already show suspicious activity moving into case records.
 
-- **Status:** Partially Working
-- **What happened:** Fraud investigation case records were created for suspicious transactions. The `Fraud Investigation Case Records` table includes case IDs connected to transaction IDs such as `TXN-0007`, `TXN-0014`, and `TXN-0019`. This shows that suspicious records can become investigation cases, but the team still needs to confirm whether the case creation is fully automated.
-- **Screenshot:** `screenshots/specialist-case.png`
+---
 
-### Integration Dashboard
+## Expected End-to-End Path
 
-- **Status:** Partially Working
-- **What happened:** Airtable views show processed AI results and investigation records. However, the team still needs to confirm one final dashboard view that clearly shows the completed record after all components have acted on it.
-- **Screenshot:** `screenshots/integration-dashboard.png`
+The expected system path is:
 
-## Gaps Found
-
-- The project may have multiple Airtable base copies, which can make it unclear whether the same record moved through the full system.
-- Some tables show AI fields as blank, while another table shows AI fields filled in.
-- The team needs to confirm that Ingestion, AI Core, Specialist, and Integration are all using the same Airtable base and the same `Transactions` table.
-- The Specialist case creation appears to work, but it still needs to be confirmed as automatic.
-- The Integration dashboard view needs to clearly show the final completed transaction record and its case status.
-
-## Fix Plan
-
-1. **Confirm the correct Airtable base**
-   - Owner: Integration / whole team
-   - Estimated effort: 30 minutes
-   - Make sure all workflows and views use the same Airtable base.
-
-2. **Run one clean test record**
-   - Owner: Ingestion + AI Core
-   - Estimated effort: 1 hour
-   - Use one record such as `TXN-CP2-001` and track it through the entire process.
-
-3. **Verify AI Core update**
-   - Owner: AI Core
-   - Estimated effort: 30 minutes
-   - Confirm the workflow updates `HF Label`, `HF Confidence`, `Groq Analysis`, and `AI Processed`.
-
-4. **Verify Specialist case creation**
-   - Owner: Specialist
-   - Estimated effort: 1 hour
-   - Confirm whether a high-risk transaction automatically creates a fraud case.
-
-5. **Create a final dashboard view**
-   - Owner: Integration
-   - Estimated effort: 1 hour
-   - Build a view showing transaction ID, risk/AI fields, case status, and final result.
-
-## Final Notes
-
-The checkpoint test shows meaningful progress. The AI Core is working, and investigation case records exist. The main issue is proving that the same record travels through every component in the same connected system without manual copying.
+```text
+Ingestion → AI Core → Specialist → Integration Dashboard
